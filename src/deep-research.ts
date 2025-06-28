@@ -1,4 +1,4 @@
-import FirecrawlApp, { SearchResponse } from '@mendable/firecrawl-js';
+import FirecrawlApp from '@mendable/firecrawl-js';
 import { generateObject } from 'ai';
 import { compact } from 'lodash-es';
 import pLimit from 'p-limit';
@@ -6,6 +6,18 @@ import { z } from 'zod';
 
 import { getModel, trimPrompt } from './ai/providers';
 import { systemPrompt } from './prompt';
+
+const axios = require('axios');
+
+const apiKey = process.env.SERPAPI_KEY
+
+const serperClient = axios.create({
+  baseURL: 'https://google.serper.dev',
+  headers: {
+    'X-API-KEY': apiKey,
+    'Content-Type': 'application/json'
+  }
+});
 
 function log(...args: any[]) {
   console.log(...args);
@@ -26,15 +38,82 @@ type ResearchResult = {
   visitedUrls: string[];
 };
 
+type ScrapedContent = {
+  url: string;
+  markdown: string;
+};
+
+type SearchAndScrapeResult = {
+  data: ScrapedContent[];
+};
+
 // increase this if you have higher API rate limits
 const ConcurrencyLimit = Number(process.env.FIRECRAWL_CONCURRENCY) || 2;
 
 // Initialize Firecrawl with optional API key and optional base url
-
 const firecrawl = new FirecrawlApp({
   apiKey: process.env.FIRECRAWL_KEY ?? '',
   apiUrl: process.env.FIRECRAWL_BASE_URL,
 });
+
+// Search using SERPAPI and then scrape URLs using Firecrawl
+async function searchAndScrape(query: string, limit: number = 5): Promise<SearchAndScrapeResult> {
+  try {
+    // Step 1: Get search results from SERPAPI
+    log(`Searching with SERPAPI: ${query}`);
+    const searchResults = await serperClient.post('/search', { q: query, location: "China", gl: 'cn', 'hl': 'zh-CN', num: limit });
+    console.log(searchResults.data);
+    // Extract URLs from organic results
+    const urls = (searchResults.data.organic || [])
+      .slice(0, limit)
+      .map((result: any) => result.link)
+      .filter((url: string) => url && url.startsWith('http'));
+
+    log(`Found ${urls.length} URLs to scrape`);
+
+    // Step 2: Scrape each URL using Firecrawl
+    const scrapeLimit = pLimit(ConcurrencyLimit);
+    const scrapedContent = await Promise.all(
+      urls.map((url: string) =>
+        scrapeLimit(async () => {
+          try {
+            log(`Scraping: ${url}`);
+                         const scrapeResult = await firecrawl.scrapeUrl(url, {
+               formats: ['markdown'],
+               timeout: 15000,
+             });
+             console.log(scrapeResult);
+             if (scrapeResult.success && scrapeResult.markdown) {
+               return {
+                 url: url,
+                 markdown: scrapeResult.markdown,
+               };
+             } else {
+               log(`Failed to scrape ${url}: ${scrapeResult.error || 'Unknown error'}`);
+               return null;
+             }
+          } catch (error) {
+            log(`Error scraping ${url}:`, error);
+            return null;
+          }
+        })
+      )
+    );
+
+    // Filter out failed scrapes
+    const validContent = compact(scrapedContent);
+    log(`Successfully scraped ${validContent.length}/${urls.length} URLs`);
+
+    return {
+      data: validContent,
+    };
+  } catch (error) {
+    log('Error in searchAndScrape:', error);
+    return {
+      data: [],
+    };
+  }
+}
 
 // take en user query, return a list of SERP queries
 async function generateSerpQueries({
@@ -85,11 +164,11 @@ async function processSerpResult({
   numFollowUpQuestions = 3,
 }: {
   query: string;
-  result: SearchResponse;
+  result: SearchAndScrapeResult;
   numLearnings?: number;
   numFollowUpQuestions?: number;
 }) {
-  const contents = compact(result.data.map(item => item.markdown)).map(content =>
+  const contents = compact(result.data.map((item: ScrapedContent) => item.markdown)).map((content: string) =>
     trimPrompt(content, 25_000),
   );
   log(`Ran ${query}, found ${contents.length} contents`);
@@ -219,14 +298,10 @@ export async function deepResearch({
     serpQueries.map(serpQuery =>
       limit(async () => {
         try {
-          const result = await firecrawl.search(serpQuery.query, {
-            timeout: 15000,
-            limit: 5,
-            scrapeOptions: { formats: ['markdown'] },
-          });
+          const result = await searchAndScrape(serpQuery.query, 5);
 
           // Collect URLs from this search
-          const newUrls = compact(result.data.map(item => item.url));
+          const newUrls = result.data.map(item => item.url);
           const newBreadth = Math.ceil(breadth / 2);
           const newDepth = depth - 1;
 

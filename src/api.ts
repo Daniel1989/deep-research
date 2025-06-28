@@ -156,6 +156,7 @@ ${followUpQuestions.map((q: string, i: number) => `Q: ${q}\nA: ${followUpAnswers
     // const translatedReport = await translateToChineseUtil(report);
 
     // Return the results properly
+    log("report finished")
     return res.json({
       success: true,
       report,
