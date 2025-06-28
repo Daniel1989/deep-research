@@ -23,7 +23,7 @@ On first run, this will create a template `.env.local` file. Edit it with your A
 # Required API Keys
 FIRECRAWL_KEY=your_firecrawl_api_key_here
 OPENAI_KEY=your_openai_api_key_here
-SERPAPI_KEY=your_serpapi_api_key_here
+SERPER_API_KEY=your_serper_api_key_here
 
 # Optional API Keys  
 FIREWORKS_KEY=your_fireworks_api_key_here
@@ -140,7 +140,7 @@ The `docker-start.sh` script supports these commands:
 |----------|----------|-------------|
 | `FIRECRAWL_KEY` | ✅ | Firecrawl API key for web scraping |
 | `OPENAI_KEY` | ✅ | OpenAI API key for AI processing |
-| `SERPAPI_KEY` | ✅ | SERPAPI key for web search |
+| `SERPER_API_KEY` | ✅ | Serper.dev API key for web search (fallback: `SERPAPI_KEY`) |
 | `FIREWORKS_KEY` | ❌ | Fireworks API key (alternative AI provider) |
 | `FIRECRAWL_BASE_URL` | ❌ | Custom Firecrawl endpoint |
 | `OPENAI_ENDPOINT` | ❌ | Custom OpenAI endpoint |

@@ -9,7 +9,7 @@ import { systemPrompt } from './prompt';
 
 const axios = require('axios');
 
-const apiKey = process.env.SERPAPI_KEY
+const apiKey = process.env.SERPER_API_KEY || process.env.SERPAPI_KEY
 
 const serperClient = axios.create({
   baseURL: 'https://google.serper.dev',
@@ -77,23 +77,45 @@ async function searchAndScrape(query: string, limit: number = 5): Promise<Search
       urls.map((url: string) =>
         scrapeLimit(async () => {
           try {
+            // Validate URL before scraping
+            if (!url || !url.startsWith('http')) {
+              log(`Skipping invalid URL: ${url}`);
+              return null;
+            }
+
             log(`Scraping: ${url}`);
-                         const scrapeResult = await firecrawl.scrapeUrl(url, {
-               formats: ['markdown'],
-               timeout: 15000,
-             });
-             console.log(scrapeResult);
-             if (scrapeResult.success && scrapeResult.markdown) {
-               return {
-                 url: url,
-                 markdown: scrapeResult.markdown,
-               };
-             } else {
-               log(`Failed to scrape ${url}: ${scrapeResult.error || 'Unknown error'}`);
-               return null;
-             }
-          } catch (error) {
-            log(`Error scraping ${url}:`, error);
+            
+            // Scrape with Firecrawl
+            const scrapeResult = await firecrawl.scrapeUrl(url, {
+              formats: ['markdown'],
+              timeout: 15000,
+            });
+
+            // Check if scrapeResult exists and has expected structure
+            if (!scrapeResult) {
+              log(`Failed to scrape ${url}: No response from Firecrawl`);
+              return null;
+            }
+
+            console.log(`Scrape result for ${url}:`, {
+              success: scrapeResult.success,
+              hasMarkdown: !!(scrapeResult as any).markdown,
+              error: scrapeResult.error || 'none'
+            });
+
+            if (scrapeResult.success && (scrapeResult as any).markdown) {
+              return {
+                url: url,
+                markdown: (scrapeResult as any).markdown,
+              };
+            } else {
+              const errorMsg = scrapeResult.error || 'Unknown error';
+              log(`Failed to scrape ${url}: ${errorMsg}`);
+              return null;
+            }
+          } catch (error: any) {
+            const errorMsg = error?.message || error?.toString() || 'Unknown error';
+            log(`Error scraping ${url}: ${errorMsg}`);
             return null;
           }
         })
@@ -130,9 +152,9 @@ async function generateSerpQueries({
   const res = await generateObject({
     model: getModel(),
     system: systemPrompt(),
-    prompt: `Given the following prompt from the user, generate a list of SERP queries to research the topic. Return a maximum of ${numQueries} queries, but feel free to return less if the original prompt is clear. Make sure each query is unique and not similar to each other: <prompt>${query}</prompt>\n\n${
+    prompt: `Given the following prompt from the user, generate a list of SERP queries to research the topic with a strong focus on NEWS and RECENT DEVELOPMENTS. Prioritize current events, breaking news, recent announcements, and latest developments related to the topic. Include specific news-oriented keywords like "news", "latest", "recent", "2024", "2025", "breaking", "update", "announcement" in your queries. Return a maximum of ${numQueries} queries, but feel free to return less if the original prompt is clear. Make sure each query is unique and not similar to each other: <prompt>${query}</prompt>\n\n${
       learnings
-        ? `Here are some learnings from previous research, use them to generate more specific queries: ${learnings.join(
+        ? `Here are some learnings from previous research, use them to generate more specific NEWS-FOCUSED queries: ${learnings.join(
             '\n',
           )}`
         : ''
@@ -145,7 +167,7 @@ async function generateSerpQueries({
             researchGoal: z
               .string()
               .describe(
-                'First talk about the goal of the research that this query is meant to accomplish, then go deeper into how to advance the research once the results are found, mention additional research directions. Be as specific as possible, especially for additional research directions.',
+                'First talk about the goal of the NEWS-FOCUSED research that this query is meant to accomplish, emphasizing current events and recent developments. Then go deeper into how to advance the research once the results are found, mentioning additional research directions that focus on breaking news, latest updates, and recent announcements. Be as specific as possible about news sources and current events.',
               ),
           }),
         )

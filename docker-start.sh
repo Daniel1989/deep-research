@@ -15,7 +15,7 @@ if [ ! -f ".env.local" ]; then
 # Required API Keys
 FIRECRAWL_KEY=your_firecrawl_api_key_here
 OPENAI_KEY=your_openai_api_key_here
-SERPAPI_KEY=your_serpapi_api_key_here
+SERPER_API_KEY=your_serper_api_key_here
 
 # Optional API Keys
 FIREWORKS_KEY=your_fireworks_api_key_here
@@ -29,7 +29,7 @@ FIREWORKS_KEY=your_fireworks_api_key_here
 # PORT=3051
 EOF
     echo "📝 Please edit .env.local with your API keys before running again."
-    echo "   You need at least FIRECRAWL_KEY, OPENAI_KEY, and SERPAPI_KEY"
+    echo "   You need at least FIRECRAWL_KEY, OPENAI_KEY, and SERPER_API_KEY"
     exit 1
 fi
 

@@ -15,7 +15,7 @@ services:
       # Uncomment and set your API keys:
       # - FIRECRAWL_KEY="fc-ce6a94e8422a427bb55d7f34b7e9bf06"
       # - OPENAI_KEY="sk-mFlSYAwBoIHaIykVE8C3Fc89D6C34c4bA638FcA99cD79aDf"
-      # - SERPAPI_KEY="your_serpapi_key_here"
+      # - SERPER_API_KEY="your_serper_api_key_here"
       # - CONTEXT_SIZE="128000"
       # - OPENAI_ENDPOINT="http://openai-proxy.miracleplus.com/v1"
 
